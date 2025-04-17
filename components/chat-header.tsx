@@ -1,15 +1,16 @@
 'use client';
 
-import Link from 'next/link';
+import { usePrivy } from '@privy-io/react-auth';
 import { useRouter } from 'next/navigation';
 import { useWindowSize } from 'usehooks-ts';
 
 import { ModelSelector } from '@/components/model-selector';
 import { SidebarToggle } from '@/components/sidebar-toggle';
 import { Button } from '@/components/ui/button';
-import { PlusIcon, VercelIcon } from './icons';
-import { useSidebar } from './ui/sidebar';
 import { memo } from 'react';
+import { PlusIcon } from './icons';
+import { SolanaWalletSelector } from './solana-wallet-selector';
+import { useSidebar } from './ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { type VisibilityType, VisibilitySelector } from './visibility-selector';
 
@@ -17,15 +18,20 @@ function PureChatHeader({
   chatId,
   selectedModelId,
   selectedVisibilityType,
+  selectedSolanaWallet,
+  setSelectedSolanaWallet,
   isReadonly,
 }: {
   chatId: string;
   selectedModelId: string;
   selectedVisibilityType: VisibilityType;
+  selectedSolanaWallet: string | undefined;
+  setSelectedSolanaWallet: (wallet: string) => void;
   isReadonly: boolean;
 }) {
   const router = useRouter();
   const { open } = useSidebar();
+  const { ready, authenticated, login, logout, user } = usePrivy();
 
   const { width: windowWidth } = useWindowSize();
 
@@ -38,14 +44,13 @@ function PureChatHeader({
           <TooltipTrigger asChild>
             <Button
               variant="outline"
-              className="order-2 md:order-1 md:px-2 px-2 md:h-fit ml-auto md:ml-0"
+              className="order-2 md:px-2 px-2 md:h-fit md:ml-0"
               onClick={() => {
                 router.push('/');
                 router.refresh();
               }}
             >
               <PlusIcon />
-              <span className="md:sr-only">New Chat</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>New Chat</TooltipContent>
@@ -53,10 +58,7 @@ function PureChatHeader({
       )}
 
       {!isReadonly && (
-        <ModelSelector
-          selectedModelId={selectedModelId}
-          className="order-1 md:order-2"
-        />
+        <ModelSelector selectedModelId={selectedModelId} className="order-2" />
       )}
 
       {!isReadonly && (
@@ -67,18 +69,32 @@ function PureChatHeader({
         />
       )}
 
-      <Button
-        className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-zinc-50 dark:text-zinc-900 hidden md:flex py-1.5 px-2 h-fit md:h-[34px] order-4 md:ml-auto"
-        asChild
-      >
-        <Link
-          href={`https://vercel.com/new/clone?repository-url=https://github.com/vercel/ai-chatbot&env=AUTH_SECRET&envDescription=Learn more about how to get the API Keys for the application&envLink=https://github.com/vercel/ai-chatbot/blob/main/.env.example&demo-title=AI Chatbot&demo-description=An Open-Source AI Chatbot Template Built With Next.js and the AI SDK by Vercel.&demo-url=https://chat.vercel.ai&products=[{"type":"integration","protocol":"ai","productSlug":"grok","integrationSlug":"xai"},{"type":"integration","protocol":"storage","productSlug":"neon","integrationSlug":"neon"},{"type":"blob"}]`}
-          target="_noblank"
+      <div className="ml-auto flex flex-row gap-2 order-4">
+        {!isReadonly && (
+          <SolanaWalletSelector
+            selectedSolanaWallet={selectedSolanaWallet}
+            setSelectedSolanaWallet={setSelectedSolanaWallet}
+          />
+        )}
+
+        <Button
+          className="bg-primary dark:bg-primary hover:bg-primary/90 dark:hover:bg-primary/90 text-primary-foreground dark:text-primary-foreground md:flex py-1.5 px-2 h-fit md:h-fit"
+          disabled={!ready}
+          onClick={authenticated ? logout : login}
         >
-          <VercelIcon size={16} />
-          Deploy with Vercel
-        </Link>
-      </Button>
+          {authenticated ? (
+            <>
+              {user?.email?.address
+                ? user.email.address
+                : user?.twitter?.username
+                  ? user.twitter.username
+                  : 'Logout'}
+            </>
+          ) : (
+            'Login'
+          )}
+        </Button>
+      </div>
     </header>
   );
 }

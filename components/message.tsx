@@ -1,24 +1,28 @@
 'use client';
 
+import type { Vote } from '@/lib/db/schema';
+import { cn } from '@/lib/utils';
+import type { UseChatHelpers } from '@ai-sdk/react';
 import type { UIMessage } from 'ai';
 import cx from 'classnames';
+import equal from 'fast-deep-equal';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useState } from 'react';
-import type { Vote } from '@/lib/db/schema';
 import { DocumentToolCall, DocumentToolResult } from './document';
+import { DocumentPreview } from './document-preview';
 import { PencilEditIcon, SparklesIcon } from './icons';
 import { Markdown } from './markdown';
 import { MessageActions } from './message-actions';
+import { MessageEditor } from './message-editor';
+import { MessageReasoning } from './message-reasoning';
 import { PreviewAttachment } from './preview-attachment';
-import { Weather } from './weather';
-import equal from 'fast-deep-equal';
-import { cn } from '@/lib/utils';
+import { TradeResult } from './trade-result';
+import { TgChatsResult } from './tg-chats-result';
+import { TgMessagesResult } from './tg-messages-result';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { MessageEditor } from './message-editor';
-import { DocumentPreview } from './document-preview';
-import { MessageReasoning } from './message-reasoning';
-import { UseChatHelpers } from '@ai-sdk/react';
+import { Weather } from './weather';
+import { deleteTrailingMessages } from '@/app/(chat)/actions';
 
 const PurePreviewMessage = ({
   chatId,
@@ -116,6 +120,58 @@ const PurePreviewMessage = ({
                         </Tooltip>
                       )}
 
+                      {message.role === 'user' && !isReadonly && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              data-testid="message-retry-button"
+                              variant="ghost"
+                              className="px-2 h-fit rounded-full text-muted-foreground opacity-0 group-hover/message:opacity-100"
+                              onClick={async () => {
+                                await deleteTrailingMessages({
+                                  id: message.id,
+                                });
+                                setMessages((messages) => {
+                                  const index = messages.findIndex(
+                                    (m) => m.id === message.id,
+                                  );
+
+                                  if (index !== -1) {
+                                    const updatedMessage = {
+                                      ...message,
+                                    };
+
+                                    return [
+                                      ...messages.slice(0, index),
+                                      updatedMessage,
+                                    ];
+                                  }
+
+                                  return messages;
+                                });
+                                reload();
+                              }}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                <path d="M3 3v5h5" />
+                              </svg>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Retry</TooltipContent>
+                        </Tooltip>
+                      )}
+
                       <div
                         data-testid="message-content"
                         className={cn('flex flex-col gap-4', {
@@ -137,6 +193,7 @@ const PurePreviewMessage = ({
                       <MessageEditor
                         key={message.id}
                         message={message}
+                        text={part.text}
                         setMode={setMode}
                         setMessages={setMessages}
                         reload={reload}
@@ -205,6 +262,12 @@ const PurePreviewMessage = ({
                           result={result}
                           isReadonly={isReadonly}
                         />
+                      ) : toolName === 'GET_TG_CHATS' ? (
+                        <TgChatsResult result={result} />
+                      ) : toolName === 'GET_TG_MESSAGES' ? (
+                        <TgMessagesResult result={result} />
+                      ) : toolName === 'TRADE' ? (
+                        <TradeResult result={result} />
                       ) : (
                         <pre>{JSON.stringify(result, null, 2)}</pre>
                       )}

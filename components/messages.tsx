@@ -60,6 +60,7 @@ function PureMessages({
 
       <div
         ref={messagesEndRef}
+        id="messages-end-ref"
         className="shrink-0 min-w-[24px] min-h-[24px]"
       />
     </div>

@@ -2,13 +2,14 @@ import { Toaster } from 'sonner';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
+import { PrivyProvider } from '@/components/privy-provider';
 
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://chat.vercel.ai'),
-  title: 'Next.js Chatbot Template',
-  description: 'Next.js chatbot template using the AI SDK.',
+  metadataBase: new URL('https://chatxbt.tensor.trade'),
+  title: 'TensorGPT',
+  description: 'TensorGPT is your agentic trading terminal.',
 };
 
 export const viewport = {
@@ -76,8 +77,10 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Toaster position="top-center" />
-          {children}
+          <PrivyProvider>
+            <Toaster position="top-center" />
+            {children}
+          </PrivyProvider>
         </ThemeProvider>
       </body>
     </html>

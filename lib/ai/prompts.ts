@@ -31,18 +31,31 @@ This is a guide for using artifacts tools: \`createDocument\` and \`updateDocume
 Do not update document right after creating it. Wait for user feedback or request to update it.
 `;
 
+const solanaWalletPrompt = (walletAddress: string) => `
+For some tools, you will need to pass in a base58 encoded public key of a Solana wallet address.
+
+Use the following wallet address EXACTLY: ${walletAddress}
+`;
+
 export const regularPrompt =
   'You are a friendly assistant! Keep your responses concise and helpful.';
 
 export const systemPrompt = ({
   selectedChatModel,
+  selectedSolanaWallet,
 }: {
   selectedChatModel: string;
+  selectedSolanaWallet: string | undefined;
 }) => {
+  let prompt = regularPrompt;
+  if (selectedSolanaWallet) {
+    prompt += `\n${solanaWalletPrompt(selectedSolanaWallet)}`;
+  }
+
   if (selectedChatModel === 'chat-model-reasoning') {
-    return regularPrompt;
+    return prompt;
   } else {
-    return `${regularPrompt}\n\n${artifactsPrompt}`;
+    return `${prompt}\n\n${artifactsPrompt}`;
   }
 };
 

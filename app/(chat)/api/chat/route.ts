@@ -1,7 +1,9 @@
 import {
+  APICallError,
   UIMessage,
   appendResponseMessages,
   createDataStreamResponse,
+  experimental_createMCPClient,
   smoothStream,
   streamText,
 } from 'ai';
@@ -25,6 +27,7 @@ import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { isProductionEnvironment } from '@/lib/constants';
 import { myProvider } from '@/lib/ai/providers';
+import { openai, OpenAIResponsesProviderOptions } from '@ai-sdk/openai';
 
 export const maxDuration = 60;
 
@@ -34,11 +37,15 @@ export async function POST(request: Request) {
       id,
       messages,
       selectedChatModel,
+      selectedSolanaWallet,
     }: {
       id: string;
       messages: Array<UIMessage>;
       selectedChatModel: string;
+      selectedSolanaWallet: string | undefined;
     } = await request.json();
+
+    const requestId = generateUUID();
 
     const session = await auth();
 
@@ -79,34 +86,84 @@ export async function POST(request: Request) {
       ],
     });
 
+    const model = myProvider.languageModel(selectedChatModel);
+    const mcpClient = await experimental_createMCPClient({
+      transport: {
+        type: 'sse',
+        url: 'http://localhost:3001/sse',
+      },
+    });
+    let tools = await mcpClient.tools();
+    // if (model.provider.startsWith('openai')) {
+    //   tools = Object.fromEntries(
+    //     Object.entries(tools).map(([k, v]) => {
+    //       if ('parameters' in v) {
+    //         if ('jsonSchema' in v.parameters) {
+    //           // @ts-expect-error
+    //           v.parameters.jsonSchema.properties = Object.fromEntries(
+    //             // @ts-expect-error
+    //             Object.entries(v.parameters.jsonSchema.properties).map(
+    //               ([k2, v2]) => {
+    //                 const newV = Object.fromEntries(
+    //                   // @ts-expect-error
+    //                   Object.entries(v2).filter(
+    //                     ([k3]) =>
+    //                       ![
+    //                         'minLength',
+    //                         'maxLength',
+    //                         'default',
+    //                         'exclusiveMinimum',
+    //                       ].includes(k3),
+    //                   ),
+    //                 );
+    //                 return [k2, newV];
+    //               },
+    //             ),
+    //           );
+    //         }
+    //       }
+    //       return [k, v];
+    //     }),
+    //   );
+    // }
+
+    console.log('BEGIN request', requestId);
     return createDataStreamResponse({
       execute: (dataStream) => {
         const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel }),
+          model,
+          system: systemPrompt({ selectedChatModel, selectedSolanaWallet }),
           messages,
           maxSteps: 5,
-          experimental_activeTools:
-            selectedChatModel === 'chat-model-reasoning'
-              ? []
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                ],
+          providerOptions: {
+            openai: {
+              // Run into a bunch of problems otherwise.
+              strictSchemas: false,
+            } satisfies OpenAIResponsesProviderOptions,
+          },
+          // experimental_activeTools:
+          //   selectedChatModel === 'chat-model-reasoning'
+          //     ? []
+          //     : [
+          //         'getWeather',
+          //         'createDocument',
+          //         'updateDocument',
+          //         'requestSuggestions',
+          //       ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
           tools: {
+            ...tools,
             getWeather,
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
+          },
+
+          onStepFinish: async ({ response, stepType }) => {
+            console.log(requestId, ': finished step', stepType, response.id);
           },
           onFinish: async ({ response }) => {
+            console.log(requestId, ': FINISHED response', response.id);
+            await mcpClient.close();
+
             if (session.user?.id) {
               try {
                 const assistantId = getTrailingMessageId({
@@ -154,11 +211,17 @@ export async function POST(request: Request) {
           sendReasoning: true,
         });
       },
-      onError: () => {
+      onError: (error) => {
+        console.error(error);
+        if (error instanceof APICallError) {
+          // console.error(JSON.stringify(error.requestBodyValues, null, 2));
+          return error.responseBody ?? 'Oops, an error occurred!';
+        }
         return 'Oops, an error occurred!';
       },
     });
   } catch (error) {
+    console.error(error);
     return new Response('An error occurred while processing your request!', {
       status: 404,
     });

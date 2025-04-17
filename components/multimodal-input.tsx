@@ -114,6 +114,25 @@ function PureMultimodalInput({
     setLocalStorageInput('');
     resetHeight();
 
+    // Find the messages end ref elements and scroll to them
+    const messagesEndElement = document.getElementById('messages-end-ref');
+    const artifactMessagesEndElement = document.getElementById(
+      'artifact-messages-end-ref',
+    );
+
+    // Scroll to the appropriate end element based on which one is visible
+    if (messagesEndElement && messagesEndElement.offsetParent !== null) {
+      messagesEndElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    } else if (
+      artifactMessagesEndElement &&
+      artifactMessagesEndElement.offsetParent !== null
+    ) {
+      artifactMessagesEndElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end',
+      });
+    }
+
     if (width && width > 768) {
       textareaRef.current?.focus();
     }

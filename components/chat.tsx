@@ -1,20 +1,21 @@
 'use client';
 
-import type { Attachment, UIMessage } from 'ai';
-import { useChat } from '@ai-sdk/react';
-import { useState } from 'react';
-import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
+import { useArtifactSelector } from '@/hooks/use-artifact';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher, generateUUID } from '@/lib/utils';
-import { Artifact } from './artifact';
-import { MultimodalInput } from './multimodal-input';
-import { Messages } from './messages';
-import type { VisibilityType } from './visibility-selector';
-import { useArtifactSelector } from '@/hooks/use-artifact';
+import { useChat } from '@ai-sdk/react';
+import type { Attachment, UIMessage } from 'ai';
+import { useState } from 'react';
 import { toast } from 'sonner';
+import useSWR, { useSWRConfig } from 'swr';
 import { unstable_serialize } from 'swr/infinite';
+import { useLocalStorage } from 'usehooks-ts';
+import { Artifact } from './artifact';
+import { Messages } from './messages';
+import { MultimodalInput } from './multimodal-input';
 import { getChatHistoryPaginationKey } from './sidebar-history';
+import type { VisibilityType } from './visibility-selector';
 
 export function Chat({
   id,
@@ -30,6 +31,9 @@ export function Chat({
   isReadonly: boolean;
 }) {
   const { mutate } = useSWRConfig();
+  const [selectedSolanaWallet, setSelectedSolanaWallet] = useLocalStorage<
+    string | undefined
+  >('selected-solana-wallet', undefined);
 
   const {
     messages,
@@ -43,7 +47,11 @@ export function Chat({
     reload,
   } = useChat({
     id,
-    body: { id, selectedChatModel: selectedChatModel },
+    body: {
+      id,
+      selectedChatModel: selectedChatModel,
+      selectedSolanaWallet: selectedSolanaWallet,
+    },
     initialMessages,
     experimental_throttle: 100,
     sendExtraMessageFields: true,
@@ -51,7 +59,8 @@ export function Chat({
     onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
-    onError: () => {
+    onError: (error) => {
+      console.error(error);
       toast.error('An error occurred, please try again!');
     },
   });
@@ -71,6 +80,8 @@ export function Chat({
           chatId={id}
           selectedModelId={selectedChatModel}
           selectedVisibilityType={selectedVisibilityType}
+          selectedSolanaWallet={selectedSolanaWallet}
+          setSelectedSolanaWallet={setSelectedSolanaWallet}
           isReadonly={isReadonly}
         />
 
